@@ -79,3 +79,5 @@ namespace Games
         }
     }
 }
+
+// Compare this snippet from Games.Infraestructure/Validators/ReviewDtoValidator.cs:
