@@ -12,7 +12,7 @@ public partial class Review
     public int GameId { get; set; }
     public int UserId { get; set; }
     public string Content { get; set; } = null!;
-    public byte Score { get; set; }           // 0..255; usa validaciones para limitar a 1..10
+    public byte Score { get; set; }           
     public DateTime CreatedAt { get; set; }
     public bool IsActive { get; set; } = true;
 

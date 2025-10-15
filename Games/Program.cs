@@ -1,6 +1,13 @@
 using Microsoft.EntityFrameworkCore;
 using Games.Infrastructure.Data;
 using Gamess.Core.Entities;
+using AutoMapper;
+using Games.Infrastructure.Repositories;
+using Gamess.Core.Interfaces;
+using Games.Infrastructure.Mappings;
+using FluentValidation;
+using Games.Infrastructure.Filters;
+using Games.Infrastructure.Validators;
 
 namespace Games
 {
@@ -21,17 +28,50 @@ namespace Games
                 options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)));
             #endregion
 
-            // Agrega los servicios al contenedor.
+            // =====================================
+            // CONFIGURACIÓN DE SERVICIOS PRINCIPALES
+            // =====================================
+
+            // Controladores + JSON + desactivar filtro default
             builder.Services.AddControllers()
                 .AddNewtonsoftJson(options =>
                 {
                     options.SerializerSettings.ReferenceLoopHandling =
                         Newtonsoft.Json.ReferenceLoopHandling.Ignore;
+                })
+                .ConfigureApiBehaviorOptions(options =>
+                {
+                    // Desactiva la validación automática de ModelState
+                    // para que funcione nuestro ValidationFilter personalizado
+                    options.SuppressModelStateInvalidFilter = true;
                 });
 
+            // AutoMapper
+            builder.Services.AddAutoMapper(typeof(MappingProfile));
+
+            // Repositorios
+            builder.Services.AddTransient<IUserRepository, UserRepository>();
+            builder.Services.AddTransient<IGameRepository, GameRepository>();
+            builder.Services.AddTransient<IReviewRepository, ReviewRepository>();
+
+            // Validadores (FluentValidation)
+            builder.Services.AddValidatorsFromAssemblyContaining<GameDtoValidator>();
+            builder.Services.AddValidatorsFromAssemblyContaining<UserDtoValidator>();
+            builder.Services.AddValidatorsFromAssemblyContaining<ReviewDtoValidator>();
+
+            // Servicio de validación (resuelve IValidator<T>)
+            builder.Services.AddScoped<IValidationService, ValidationService>();
+
+            // Filtro global de validación
+            builder.Services.AddControllers(options =>
+            {
+                options.Filters.Add<ValidationFilter>();
+            });
+
+            // =====================================
             var app = builder.Build();
 
-            // Configura el pipeline de solicitudes HTTP.
+            // Middleware
             app.UseHttpsRedirection();
             app.UseAuthorization();
             app.MapControllers();
