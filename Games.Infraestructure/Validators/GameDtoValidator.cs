@@ -31,7 +31,7 @@ namespace Games.Infrastructure.Validators
                 .GreaterThanOrEqualTo(0).When(x => x.MinAge.HasValue)
                 .WithMessage("MinAge no puede ser negativo.");
 
-            // Consistencia entre AgeRating y MinAge (opcional, pero buena práctica)
+           
             When(x => !string.IsNullOrWhiteSpace(x.AgeRating) && x.MinAge.HasValue, () =>
             {
                 RuleFor(x => x).Must(x =>

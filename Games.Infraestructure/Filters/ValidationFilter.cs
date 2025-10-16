@@ -23,12 +23,12 @@ namespace Games.Infrastructure.Filters
             {
                 if (arg is null) continue;
 
-                // ¿Existe un validador registrado para este tipo?
+                
                 var validatorType = typeof(IValidator<>).MakeGenericType(arg.GetType());
                 var validator = _serviceProvider.GetService(validatorType);
                 if (validator is null) continue;
 
-                // Llama al ValidationService<T>.ValidateAsync
+                
                 var method = typeof(IValidationService).GetMethod(nameof(IValidationService.ValidateAsync))!;
                 var generic = method.MakeGenericMethod(arg.GetType());
                 var task = (Task<ValidationResult>)generic.Invoke(_validationService, new[] { arg })!;

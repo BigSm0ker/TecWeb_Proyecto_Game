@@ -32,7 +32,7 @@ namespace Games
             // CONFIGURACIÓN DE SERVICIOS PRINCIPALES
             // =====================================
 
-            // Controladores + JSON + desactivar filtro default
+           
             builder.Services.AddControllers()
                 .AddNewtonsoftJson(options =>
                 {
@@ -41,8 +41,7 @@ namespace Games
                 })
                 .ConfigureApiBehaviorOptions(options =>
                 {
-                    // Desactiva la validación automática de ModelState
-                    // para que funcione nuestro ValidationFilter personalizado
+                    
                     options.SuppressModelStateInvalidFilter = true;
                 });
 

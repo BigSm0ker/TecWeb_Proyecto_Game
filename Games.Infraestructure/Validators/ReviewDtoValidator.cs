@@ -1,6 +1,4 @@
-﻿// Games.Infrastructure/Validators/ReviewDtoValidator.cs
-using FluentValidation;
-
+﻿using FluentValidation;
 using Gamess.Infraestructure.DTOs;
 
 namespace Games.Infrastructure.Validators
@@ -9,24 +7,18 @@ namespace Games.Infrastructure.Validators
     {
         public ReviewDtoValidator()
         {
-            RuleFor(x => x.GameId)
-                .GreaterThan(0).WithMessage("GameId debe ser mayor a 0.");
+           
 
             RuleFor(x => x.UserId)
                 .GreaterThan(0).WithMessage("UserId debe ser mayor a 0.");
 
             RuleFor(x => x.Content)
-                .NotEmpty().WithMessage("El contenido es requerido.")
-                .MaximumLength(500);
+                .NotEmpty().WithMessage("El contenido es obligatorio.")
+                .MaximumLength(500).WithMessage("El contenido no puede superar los 500 caracteres.");
 
             RuleFor(x => x.Score)
-                .InclusiveBetween((byte)1, (byte)10)
-                .WithMessage("Score debe estar entre 1 y 10.");
+    .InclusiveBetween((byte)1, (byte)10).WithMessage("La puntuación debe estar entre 1 y 10.");
 
-            // CreatedAt lo suele poner el server; si llega, que no sea futura.
-            RuleFor(x => x.CreatedAt)
-                .LessThanOrEqualTo(DateTime.UtcNow)
-                .WithMessage("CreatedAt no puede ser futura.");
         }
     }
 }

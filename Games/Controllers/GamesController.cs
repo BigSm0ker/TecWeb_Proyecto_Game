@@ -72,7 +72,7 @@ namespace Games.Api.Controllers
             return Ok(_mapper.Map<IEnumerable<GameDto>>(games));
         }
 
-        // GET /api/games/top-rated?take=10
+        
         [HttpGet("top-rated")]
         public async Task<IActionResult> GetTopRated([FromQuery] int take = 10)
         {
@@ -90,11 +90,11 @@ namespace Games.Api.Controllers
             return Ok(result);
         }
 
-        // GET /api/games/low-rated
+        
         [HttpGet("low-rated")]
         public async Task<IActionResult> GetLowRated([FromQuery] int take = 10)
         {
-            var bottom = await _repo.GetLowRatedAsync(take);  // nuevo método
+            var bottom = await _repo.GetLowRatedAsync(take);  
             var result = bottom.Select(t =>
             {
                 var dto = _mapper.Map<GameDto>(t.Game);
@@ -104,7 +104,7 @@ namespace Games.Api.Controllers
             });
             return Ok(result);
         }
-        // GET /api/games/search?title=valor
+        
         [HttpGet("search")]
         public async Task<IActionResult> Search([FromQuery] string title)
         {
@@ -115,7 +115,7 @@ namespace Games.Api.Controllers
             return Ok(_mapper.Map<IEnumerable<GameDto>>(games));
         }
 
-        // GET /api/games/age?min=7&max=13&includeUnknown=false
+       
         [HttpGet("age")]
         public async Task<IActionResult> GetByAge([FromQuery] int? min, [FromQuery] int? max, [FromQuery] bool includeUnknown = false)
         {

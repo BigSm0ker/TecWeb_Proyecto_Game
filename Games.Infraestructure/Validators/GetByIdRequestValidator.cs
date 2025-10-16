@@ -16,6 +16,6 @@ namespace Games.Infrastructure.Validators
         }
 
         private bool BeAValidIdFormat(int id)
-            => id.ToString().Length <= 7; // Máximo 7 dígitos
+            => id.ToString().Length <= 7;
     }
 }

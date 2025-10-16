@@ -72,7 +72,7 @@ namespace Games.Infrastructure.Repositories
                 .ThenByDescending(x => x.Cnt)
                 .Take(take);
 
-            // Une con Games e incluye Reviews para mapear a DTO luego
+            
             var joined = from q in query
                          join game in _ctx.Games.Include(g => g.Reviews)
                              on q.GameId equals game.Id
