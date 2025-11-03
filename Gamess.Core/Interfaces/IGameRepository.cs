@@ -3,7 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Gamess.Core.CustomEntities;
 using Gamess.Core.Entities;
+using Gamess.Core.QueryFilters;
 
 
 namespace Gamess.Core.Interfaces
@@ -20,6 +22,7 @@ namespace Gamess.Core.Interfaces
         Task<IEnumerable<(Game Game, double AvgScore, int ReviewsCount)>> GetLowRatedAsync(int take);
         Task<IEnumerable<Game>> SearchByTitleAsync(string title);
         Task<IEnumerable<Game>> GetByAgeRangeAsync(int? min, int? max, bool includeUnknown = false);
+        Task<PagedList<Game>> GetAllFilteredAsync(GameQueryFilter filters, PaginationQueryFilter pagination);
 
 
     }

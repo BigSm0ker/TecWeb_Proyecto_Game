@@ -1,84 +1,112 @@
-﻿
-using AutoMapper;
+﻿using AutoMapper;
 using Microsoft.AspNetCore.Mvc;
-using Gamess.Core.Interfaces;
+
 using Gamess.Core.Entities;
+using Gamess.Core.Interfaces;
+using Gamess.Core.QueryFilters;       // <-- filtros (Game/User/Review + Pagination)
+using Gamess.Core.CustomEntities;     // <-- PagedList
+using Games.Api.Responses;            // <-- ApiResponse
 using Gamess.Infraestructure.DTOs;
 
 namespace Games.Api.Controllers
 {
-
+    // =========================================================
+    // GAMES
+    // =========================================================
     [Route("api/[controller]")]
     [ApiController]
     public class GamesController : ControllerBase
     {
-        private readonly IGameRepository _repo;
+        private readonly IGameService _svc;
         private readonly IMapper _mapper;
-        public GamesController(IGameRepository repo, IMapper mapper)
+
+        public GamesController(IGameService svc, IMapper mapper)
         {
-            _repo = repo;
+            _svc = svc;
             _mapper = mapper;
+        }
+
+        // GET: /api/games/filter?title=...&genre=...&pageNumber=1&pageSize=10
+        [HttpGet("filter")]
+        public async Task<IActionResult> Filter([FromQuery] GameQueryFilter filters, [FromQuery] PaginationQueryFilter pagination)
+        {
+            var paged = await _svc.GetAllAsync(filters, pagination);
+            var dto = _mapper.Map<IEnumerable<GameDto>>(paged);
+            var response = new ApiResponse<IEnumerable<GameDto>>(dto)
+            {
+                Pagination = paged.Pagination
+            };
+            return Ok(response);
         }
 
         [HttpGet]
         public async Task<IActionResult> Get()
         {
-            var games = await _repo.GetAllAsync();
-            return Ok(_mapper.Map<IEnumerable<GameDto>>(games));
+            var games = await _svc.GetAllAsync();
+            var dto = _mapper.Map<IEnumerable<GameDto>>(games);
+            return Ok(dto);
         }
 
         [HttpGet("{id:int}")]
         public async Task<IActionResult> GetById(int id)
         {
-            var game = await _repo.GetByIdAsync(id);
+            var game = await _svc.GetByIdAsync(id);
             return game is null ? NotFound() : Ok(_mapper.Map<GameDto>(game));
         }
 
         [HttpPost]
         public async Task<IActionResult> Post([FromBody] GameDto dto)
         {
-            var entity = _mapper.Map<Game>(dto);
-            await _repo.InsertAsync(entity);
-            var result = _mapper.Map<GameDto>(entity);
-            return CreatedAtAction(nameof(GetById), new { id = result.Id }, result);
+            try
+            {
+                var entity = _mapper.Map<Game>(dto);
+                var created = await _svc.CreateAsync(entity);
+                var result = _mapper.Map<GameDto>(created);
+                return CreatedAtAction(nameof(GetById), new { id = result.Id }, result);
+            }
+            catch (ArgumentException ex) { return BadRequest(new { error = ex.Message }); }
+            catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
         }
 
         [HttpPut("{id:int}")]
         public async Task<IActionResult> Put(int id, [FromBody] GameDto dto)
         {
             if (id != dto.Id) return BadRequest("Id mismatch");
-            var existing = await _repo.GetByIdAsync(id);
-            if (existing is null) return NotFound();
-
-            _mapper.Map(dto, existing);
-            await _repo.UpdateAsync(existing);
-            return Ok(_mapper.Map<GameDto>(existing));
+            try
+            {
+                var existing = await _svc.GetByIdAsync(id);
+                if (existing is null) return NotFound();
+                _mapper.Map(dto, existing);
+                var updated = await _svc.UpdateAsync(existing);
+                return Ok(_mapper.Map<GameDto>(updated));
+            }
+            catch (KeyNotFoundException) { return NotFound(); }
+            catch (ArgumentException ex) { return BadRequest(new { error = ex.Message }); }
+            catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
         }
 
         [HttpDelete("{id:int}")]
         public async Task<IActionResult> Delete(int id)
         {
-            var existing = await _repo.GetByIdAsync(id);
-            if (existing is null) return NotFound();
-
-            await _repo.DeleteAsync(existing);
-            return NoContent();
+            try
+            {
+                await _svc.DeleteAsync(id);
+                return NoContent();
+            }
+            catch (KeyNotFoundException) { return NotFound(); }
         }
-        // GET /api/games/by-genre/{genre}
+
         [HttpGet("by-genre/{genre}")]
         public async Task<IActionResult> GetByGenre(string genre)
         {
-            var games = await _repo.GetByGenreAsync(genre);
+            var games = await _svc.GetByGenreAsync(genre);
             return Ok(_mapper.Map<IEnumerable<GameDto>>(games));
         }
 
-        
         [HttpGet("top-rated")]
         public async Task<IActionResult> GetTopRated([FromQuery] int take = 10)
         {
-            var top = await _repo.GetTopRatedAsync(take);
-
-            
+            var top = await _svc.GetTopRatedAsync(take);
             var result = top.Select(t =>
             {
                 var dto = _mapper.Map<GameDto>(t.Game);
@@ -86,15 +114,13 @@ namespace Games.Api.Controllers
                 dto.ReviewsCount = t.ReviewsCount;
                 return dto;
             });
-
             return Ok(result);
         }
 
-        
         [HttpGet("low-rated")]
         public async Task<IActionResult> GetLowRated([FromQuery] int take = 10)
         {
-            var bottom = await _repo.GetLowRatedAsync(take);  
+            var bottom = await _svc.GetLowRatedAsync(take);
             var result = bottom.Select(t =>
             {
                 var dto = _mapper.Map<GameDto>(t.Game);
@@ -104,56 +130,140 @@ namespace Games.Api.Controllers
             });
             return Ok(result);
         }
-        
+
         [HttpGet("search")]
         public async Task<IActionResult> Search([FromQuery] string title)
         {
-            var games = await _repo.SearchByTitleAsync(title);
+            var games = await _svc.SearchByTitleAsync(title);
             if (!games.Any())
                 return NotFound($"No se encontraron juegos con el título que contenga: '{title}'");
-
             return Ok(_mapper.Map<IEnumerable<GameDto>>(games));
         }
 
-       
         [HttpGet("age")]
         public async Task<IActionResult> GetByAge([FromQuery] int? min, [FromQuery] int? max, [FromQuery] bool includeUnknown = false)
         {
-            var games = await _repo.GetByAgeRangeAsync(min, max, includeUnknown);
-           
+            var games = await _svc.GetByAgeRangeAsync(min, max, includeUnknown);
             if (!games.Any()) return NotFound("No hay juegos en ese rango de edad.");
             return Ok(_mapper.Map<IEnumerable<GameDto>>(games));
         }
-
-
-
     }
+
+    // =========================================================
+    // USERS
+    // =========================================================
+    [Route("api/[controller]")]
     [ApiController]
-    [Route("api/games/{gameId:int}/[controller]")]
-    public class ReviewsController : ControllerBase
+    public class UsersController : ControllerBase
     {
-        private readonly IReviewRepository _repo;
-        private readonly IGameRepository _games;
+        private readonly IUserService _svc;
         private readonly IMapper _mapper;
 
-        public ReviewsController(IReviewRepository repo, IGameRepository games, IMapper mapper)
+        public UsersController(IUserService svc, IMapper mapper)
         {
-            _repo = repo; _games = games; _mapper = mapper;
+            _svc = svc;
+            _mapper = mapper;
+        }
+
+        // GET: /api/users/filter?name=...&email=...&isActive=true&pageNumber=1&pageSize=10
+        [HttpGet("filter")]
+        public async Task<IActionResult> Filter([FromQuery] UserQueryFilter filters, [FromQuery] PaginationQueryFilter pagination)
+        {
+            var paged = await _svc.GetAllAsync(filters, pagination);
+            var dto = _mapper.Map<IEnumerable<UserDto>>(paged);
+            var response = new ApiResponse<IEnumerable<UserDto>>(dto)
+            {
+                Pagination = paged.Pagination
+            };
+            return Ok(response);
         }
 
         [HttpGet]
-        public async Task<IActionResult> Get(int gameId)
+        public async Task<IActionResult> Get()
         {
-            var game = await _games.GetByIdAsync(gameId);
-            if (game is null) return NotFound("Game not found");
-            var reviews = await _repo.GetByGameAsync(gameId);
-            return Ok(_mapper.Map<IEnumerable<ReviewDto>>(reviews));
+            var users = await _svc.GetAllAsync();
+            return Ok(_mapper.Map<IEnumerable<UserDto>>(users));
         }
 
         [HttpGet("{id:int}")]
+        public async Task<IActionResult> GetById(int id)
+        {
+            var user = await _svc.GetByIdAsync(id);
+            return user is null ? NotFound() : Ok(_mapper.Map<UserDto>(user));
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> Post([FromBody] UserDto dto)
+        {
+            try
+            {
+                var entity = _mapper.Map<User>(dto);
+                var created = await _svc.CreateAsync(entity);
+                var result = _mapper.Map<UserDto>(created);
+                return CreatedAtAction(nameof(GetById), new { id = result.Id }, result);
+            }
+            catch (ArgumentException ex) { return BadRequest(new { error = ex.Message }); }
+            catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+        }
+
+        [HttpPut("{id:int}")]
+        public async Task<IActionResult> Put(int id, [FromBody] UserDto dto)
+        {
+            if (id != dto.Id) return BadRequest("Id mismatch");
+            try
+            {
+                var existing = await _svc.GetByIdAsync(id);
+                if (existing is null) return NotFound();
+                _mapper.Map(dto, existing);
+                var updated = await _svc.UpdateAsync(existing);
+                return Ok(_mapper.Map<UserDto>(updated));
+            }
+            catch (KeyNotFoundException) { return NotFound(); }
+            catch (ArgumentException ex) { return BadRequest(new { error = ex.Message }); }
+            catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+        }
+
+        [HttpDelete("{id:int}")]
+        public async Task<IActionResult> Delete(int id)
+        {
+            try
+            {
+                await _svc.DeleteAsync(id);
+                return NoContent();
+            }
+            catch (KeyNotFoundException) { return NotFound(); }
+        }
+    }
+
+    // =========================================================
+    // REVIEWS
+    // =========================================================
+    [Route("api/games/{gameId:int}/[controller]")]
+    [ApiController]
+    public class ReviewsController : ControllerBase
+    {
+        private readonly IReviewService _svc;
+        private readonly IMapper _mapper;
+
+        public ReviewsController(IReviewService svc, IMapper mapper)
+        {
+            _svc = svc;
+            _mapper = mapper;
+        }
+
+        // GET: /api/games/{gameId}/reviews
+        [HttpGet]
+        public async Task<IActionResult> Get(int gameId)
+        {
+            var reviews = await _svc.GetByGameAsync(gameId);
+            return Ok(_mapper.Map<IEnumerable<ReviewDto>>(reviews));
+        }
+
+        // GET: /api/games/{gameId}/reviews/{id}
+        [HttpGet("{id:int}")]
         public async Task<IActionResult> GetById(int gameId, int id)
         {
-            var review = await _repo.GetByIdAsync(id);
+            var review = await _svc.GetByIdAsync(id);
             return review is null || review.GameId != gameId
                 ? NotFound()
                 : Ok(_mapper.Map<ReviewDto>(review));
@@ -162,122 +272,62 @@ namespace Games.Api.Controllers
         [HttpPost]
         public async Task<IActionResult> Post(int gameId, [FromBody] ReviewDto dto)
         {
-            var game = await _games.GetByIdAsync(gameId);
-            if (game is null) return NotFound("Game not found");
-
             dto.GameId = gameId;
             dto.CreatedAt = DateTime.UtcNow;
-
-            var entity = _mapper.Map<Review>(dto);
-            await _repo.InsertAsync(entity);
-
-            var result = _mapper.Map<ReviewDto>(entity);
-            return CreatedAtAction(nameof(GetById),
-                new { gameId, id = result.Id }, result);
+            try
+            {
+                var entity = _mapper.Map<Review>(dto);
+                var created = await _svc.CreateAsync(entity);
+                var result = _mapper.Map<ReviewDto>(created);
+                return CreatedAtAction(nameof(GetById), new { gameId, id = result.Id }, result);
+            }
+            catch (ArgumentException ex) { return BadRequest(new { error = ex.Message }); }
+            catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
         }
 
         [HttpPut("{id:int}")]
         public async Task<IActionResult> Put(int gameId, int id, [FromBody] ReviewDto dto)
         {
             if (id != dto.Id) return BadRequest("Id mismatch");
-            var review = await _repo.GetByIdAsync(id);
+            var review = await _svc.GetByIdAsync(id);
             if (review is null || review.GameId != gameId) return NotFound();
 
             _mapper.Map(dto, review);
-            await _repo.UpdateAsync(review);
-            return Ok(_mapper.Map<ReviewDto>(review));
+            try
+            {
+                var updated = await _svc.UpdateAsync(review);
+                return Ok(_mapper.Map<ReviewDto>(updated));
+            }
+            catch (KeyNotFoundException) { return NotFound(); }
+            catch (ArgumentException ex) { return BadRequest(new { error = ex.Message }); }
+            catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
         }
 
         [HttpDelete("{id:int}")]
         public async Task<IActionResult> Delete(int gameId, int id)
         {
-            var review = await _repo.GetByIdAsync(id);
+            var review = await _svc.GetByIdAsync(id);
             if (review is null || review.GameId != gameId) return NotFound();
-
-            await _repo.DeleteAsync(review);
-            return NoContent();
-        }
-        
-        [HttpGet("~/api/reviews")]
-        public async Task<IActionResult> GetAll()
-        {
-            var list = await _repo.GetAllAsync();
-            return Ok(_mapper.Map<IEnumerable<ReviewDto>>(list));
+            try
+            {
+                await _svc.DeleteAsync(id);
+                return NoContent();
+            }
+            catch (KeyNotFoundException) { return NotFound(); }
         }
 
-        
-        [HttpGet("~/api/reviews/{id:int}")]
-        public async Task<IActionResult> GetAnyById(int id)
+        // ---------- FILTRO GLOBAL DE REVIEWS (ruta absoluta) ----------
+        // GET: /api/reviews/filter?gameId=1&userId=...&minScore=...&pageNumber=1&pageSize=10
+        [HttpGet("~/api/reviews/filter")]
+        public async Task<IActionResult> FilterAll([FromQuery] ReviewQueryFilter filters, [FromQuery] PaginationQueryFilter pagination)
         {
-            var review = await _repo.GetByIdAsync(id);
-            return review is null ? NotFound() : Ok(_mapper.Map<ReviewDto>(review));
-        }
-
-    }
-    [ApiController]
-    [Route("api/[controller]")]
-    public class UsersController : ControllerBase
-    {
-        private readonly IUserRepository _repo;
-        private readonly IMapper _mapper;
-
-        public UsersController(IUserRepository repo, IMapper mapper)
-        {
-            _repo = repo; _mapper = mapper;
-        }
-
-        [HttpGet]
-        public async Task<IActionResult> Get()
-        {
-            var users = await _repo.GetAllAsync();
-            return Ok(_mapper.Map<IEnumerable<UserDto>>(users));
-        }
-
-        [HttpGet("{id:int}")]
-        public async Task<IActionResult> GetById(int id)
-        {
-            var user = await _repo.GetByIdAsync(id);
-            return user is null ? NotFound() : Ok(_mapper.Map<UserDto>(user));
-        }
-
-        [HttpPost]
-        public async Task<IActionResult> Post([FromBody] UserDto dto)
-        {
-            if (await _repo.EmailExistsAsync(dto.Email))
-                return BadRequest("Email ya está registrado.");
-
-            var entity = _mapper.Map<User>(dto);
-            await _repo.InsertAsync(entity);
-
-            var result = _mapper.Map<UserDto>(entity);
-            return CreatedAtAction(nameof(GetById), new { id = result.Id }, result);
-        }
-
-        [HttpPut("{id:int}")]
-        public async Task<IActionResult> Put(int id, [FromBody] UserDto dto)
-        {
-            if (id != dto.Id) return BadRequest("Id mismatch");
-
-            var existing = await _repo.GetByIdAsync(id);
-            if (existing is null) return NotFound();
-
-            if (await _repo.EmailExistsAsync(dto.Email, excludeId: id))
-                return BadRequest("Email ya está registrado por otro usuario.");
-
-            _mapper.Map(dto, existing);
-            await _repo.UpdateAsync(existing);
-            return Ok(_mapper.Map<UserDto>(existing));
-        }
-
-        [HttpDelete("{id:int}")]
-        public async Task<IActionResult> Delete(int id)
-        {
-            var existing = await _repo.GetByIdAsync(id);
-            if (existing is null) return NotFound();
-
-            await _repo.DeleteAsync(existing);
-            return NoContent();
+            var paged = await _svc.GetAllAsync(filters, pagination);
+            var dto = _mapper.Map<IEnumerable<ReviewDto>>(paged);
+            var response = new ApiResponse<IEnumerable<ReviewDto>>(dto)
+            {
+                Pagination = paged.Pagination
+            };
+            return Ok(response);
         }
     }
-
 }

@@ -1,19 +1,17 @@
 ﻿using Gamess.Core.Entities;
+using System.Linq.Expressions;
 
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace SocialMedia.Core.Interfaces
+namespace Gamess.Core.Interfaces
 {
     public interface IBaseRepository<T> where T : BaseEntity
     {
-        Task<IEnumerable<T>> GetAll();
-        Task<T> GetById(int id);
-        Task Add(T entity);
-        Task Update(T entity);
-        Task Delete(int id);
+        Task<IEnumerable<T>> GetAllAsync();
+        Task<T?> GetByIdAsync(int id);
+        Task<IEnumerable<T>> FindAsync(Expression<Func<T, bool>> predicate);
+
+        Task AddAsync(T entity);
+        void Update(T entity);
+        void Delete(T entity);
+        Task DeleteAsync(int id);
     }
 }

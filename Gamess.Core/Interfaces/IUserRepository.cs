@@ -1,4 +1,6 @@
-﻿using Gamess.Core.Entities;
+﻿using Gamess.Core.CustomEntities;
+using Gamess.Core.Entities;
+using Gamess.Core.QueryFilters;
 
 namespace Gamess.Core.Interfaces
 {
@@ -11,5 +13,6 @@ namespace Gamess.Core.Interfaces
         Task DeleteAsync(User user);
         Task<bool> ExistsAsync(int id);
         Task<bool> EmailExistsAsync(string email, int? excludeId = null);
+        Task<PagedList<User>> GetAllFilteredAsync(UserQueryFilter filters, PaginationQueryFilter pagination);
     }
 }

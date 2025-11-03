@@ -1,54 +1,55 @@
-﻿using Games.Infrastructure.Data;
+﻿using Microsoft.EntityFrameworkCore;
+using System.Linq.Expressions;
+
 using Gamess.Core.Entities;
-using Microsoft.EntityFrameworkCore;
+using Gamess.Core.Interfaces;
+using Games.Infrastructure.Data;
 
-using SocialMedia.Core.Interfaces;
-
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace SocialMedia.Infrastructure.Repositories
+namespace Games.Infrastructure.Repositories
 {
-    public class BaseRepository<T>
-        : IBaseRepository<T> where T : BaseEntity
+    public class BaseRepository<T> : IBaseRepository<T> where T : BaseEntity
     {
-        private readonly GamesContext _context;
-        private readonly DbSet<T> _entities;
-        public BaseRepository(GamesContext context)
+        protected readonly GamesContext _ctx;
+        protected readonly DbSet<T> _set;
+
+        public BaseRepository(GamesContext ctx)
         {
-            _context = context;
-            _entities = context.Set<T>();
+            _ctx = ctx;
+            _set = _ctx.Set<T>();
         }
 
-        public async Task<IEnumerable<T>> GetAll()
+        public async Task<IEnumerable<T>> GetAllAsync() =>
+            await _set.ToListAsync();
+
+        public async Task<T?> GetByIdAsync(int id) =>
+            await _set.FindAsync(id);
+
+        public async Task<IEnumerable<T>> FindAsync(Expression<Func<T, bool>> predicate) =>
+            await _set.Where(predicate).ToListAsync();
+
+        public async Task AddAsync(T entity)
         {
-            return await _entities.ToListAsync();
+            await _set.AddAsync(entity);
+            // NO SaveChanges aquí (UoW)
         }
 
-        public async Task<T> GetById(int id)
+        public void Update(T entity)
         {
-            return await _entities.FindAsync(id);
+            _set.Update(entity);
+            // NO SaveChanges aquí (UoW)
         }
 
-        public async Task Add(T entity)
+        public void Delete(T entity)
         {
-            _entities.Add(entity);
-            await _context.SaveChangesAsync();
+            _set.Remove(entity);
+            // NO SaveChanges aquí (UoW)
         }
 
-        public async Task Update(T entity)
+        public async Task DeleteAsync(int id)
         {
-            _entities.Update(entity);
-            await _context.SaveChangesAsync();
-        }
-
-        public async Task Delete(int id)
-        {
-            T entity = await GetById(id);
-            _entities.Remove(entity);
+            var entity = await GetByIdAsync(id);
+            if (entity != null) _set.Remove(entity);
+            // NO SaveChanges aquí (UoW)
         }
     }
 }

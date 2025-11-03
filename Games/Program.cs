@@ -1,13 +1,19 @@
 using Microsoft.EntityFrameworkCore;
 using Games.Infrastructure.Data;
-using Gamess.Core.Entities;
+
 using AutoMapper;
-using Games.Infrastructure.Repositories;
-using Gamess.Core.Interfaces;
 using Games.Infrastructure.Mappings;
+
+using Gamess.Core.Interfaces;
+using Games.Infrastructure.Repositories;
+
+using Gamess.Core.Services;
+
 using FluentValidation;
 using Games.Infrastructure.Filters;
 using Games.Infrastructure.Validators;
+
+using Microsoft.OpenApi.Models; // Swagger
 
 namespace Games
 {
@@ -17,66 +23,101 @@ namespace Games
         {
             var builder = WebApplication.CreateBuilder(args);
 
-            #region Configurar la BD SqlServer
-            // var connectionString = builder.Configuration.GetConnectionString("ConnectionSqlServer");
-            // builder.Services.AddDbContext<GamesContext>(options => options.UseSqlServer(connectionString));
-            #endregion
-
-            #region Configurar la BD MySql
-            var connectionString = builder.Configuration.GetConnectionString("ConnectionMySql");
+            // ===========================
+            // 1) Base de Datos (MySQL)
+            // ===========================
+            var csMySql = builder.Configuration.GetConnectionString("ConnectionMySql");
             builder.Services.AddDbContext<GamesContext>(options =>
-                options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)));
-            #endregion
+                options.UseMySql(csMySql, ServerVersion.AutoDetect(csMySql)));
 
-            // =====================================
-            // CONFIGURACIÓN DE SERVICIOS PRINCIPALES
-            // =====================================
-
-           
-            builder.Services.AddControllers()
+            // ===========================
+            // 2) MVC + JSON + Filtro Validación
+            // ===========================
+            builder.Services
+                .AddControllers(opts =>
+                {
+                    // Filtro global de FluentValidation
+                    opts.Filters.Add<ValidationFilter>();
+                    opts.Filters.Add<GlobalExceptionFilter>(); 
+                })
                 .AddNewtonsoftJson(options =>
                 {
+                    // Evita ciclos de navegación (Game -> Reviews -> Game ...)
                     options.SerializerSettings.ReferenceLoopHandling =
                         Newtonsoft.Json.ReferenceLoopHandling.Ignore;
                 })
                 .ConfigureApiBehaviorOptions(options =>
                 {
-                    
+                    // Dejamos a FluentValidation manejar errores de modelo
                     options.SuppressModelStateInvalidFilter = true;
                 });
 
-            // AutoMapper
+            // ===========================
+            // 3) AutoMapper
+            // ===========================
             builder.Services.AddAutoMapper(typeof(MappingProfile));
 
-            // Repositorios
-            builder.Services.AddTransient<IUserRepository, UserRepository>();
-            builder.Services.AddTransient<IGameRepository, GameRepository>();
-            builder.Services.AddTransient<IReviewRepository, ReviewRepository>();
+            // ===========================
+            // 4) Repositorios (Scoped recomendado con EF Core)
+            // ===========================
+            builder.Services.AddScoped<IUserRepository, UserRepository>();
+            builder.Services.AddScoped<IGameRepository, GameRepository>();
+            builder.Services.AddScoped<IReviewRepository, ReviewRepository>();
 
-            // Validadores (FluentValidation)
+            // ===========================
+            // 5) Servicios de Dominio
+            // ===========================
+            builder.Services.AddScoped<IGameService, GameService>();
+            builder.Services.AddScoped<IUserService, UserService>();
+            builder.Services.AddScoped<IReviewService, ReviewService>();
+
+            // ===========================
+            // 6) Unit of Work
+            // ===========================
+            builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
+
+            // ===========================
+            // 7) Validaciones (FluentValidation)
+            // ===========================
             builder.Services.AddValidatorsFromAssemblyContaining<GameDtoValidator>();
             builder.Services.AddValidatorsFromAssemblyContaining<UserDtoValidator>();
             builder.Services.AddValidatorsFromAssemblyContaining<ReviewDtoValidator>();
-
-            // Servicio de validación (resuelve IValidator<T>)
             builder.Services.AddScoped<IValidationService, ValidationService>();
 
-            // Filtro global de validación
-            builder.Services.AddControllers(options =>
+            // ===========================
+            // 8) Swagger (PDF pide doc del controlador)
+            // ===========================
+            builder.Services.AddEndpointsApiExplorer();
+            builder.Services.AddSwaggerGen(c =>
             {
-                options.Filters.Add<ValidationFilter>();
+                c.SwaggerDoc("v1", new OpenApiInfo
+                {
+                    Title = "Games API",
+                    Version = "v1",
+                    Description = "API de Games con Users y Reviews (Repositorio, UoW, Validación)."
+                });
             });
 
-            // =====================================
+            // ===========================
+            // 9) Pipeline HTTP
+            // ===========================
             var app = builder.Build();
 
-            // Middleware
+            // Swagger solo en Development (puedes activarlo siempre si quieres)
+            if (app.Environment.IsDevelopment())
+            {
+                app.UseSwagger();
+                app.UseSwaggerUI(c =>
+                {
+                    c.SwaggerEndpoint("/swagger/v1/swagger.json", "Games API v1");
+                });
+            }
+
             app.UseHttpsRedirection();
             app.UseAuthorization();
             app.MapControllers();
+
             app.Run();
         }
     }
 }
-
-// Compare this snippet from Games.Infraestructure/Validators/ReviewDtoValidator.cs:
