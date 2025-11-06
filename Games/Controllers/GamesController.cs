@@ -3,9 +3,9 @@ using Microsoft.AspNetCore.Mvc;
 
 using Gamess.Core.Entities;
 using Gamess.Core.Interfaces;
-using Gamess.Core.QueryFilters;       // <-- filtros (Game/User/Review + Pagination)
-using Gamess.Core.CustomEntities;     // <-- PagedList
-using Games.Api.Responses;            // <-- ApiResponse
+using Gamess.Core.QueryFilters;
+using Gamess.Core.CustomEntities;
+using Games.Api.Responses;
 using Gamess.Infraestructure.DTOs;
 
 namespace Games.Api.Controllers
@@ -19,14 +19,16 @@ namespace Games.Api.Controllers
     {
         private readonly IGameService _svc;
         private readonly IMapper _mapper;
+        private readonly IGameDapperService _dapper;
 
-        public GamesController(IGameService svc, IMapper mapper)
+        public GamesController(IGameService svc, IMapper mapper, IGameDapperService dapper)
         {
             _svc = svc;
             _mapper = mapper;
+            _dapper = dapper;
         }
 
-        // GET: /api/games/filter?title=...&genre=...&pageNumber=1&pageSize=10
+        // ----------------------- FILTRO + PAGINACIÓN -----------------------
         [HttpGet("filter")]
         public async Task<IActionResult> Filter([FromQuery] GameQueryFilter filters, [FromQuery] PaginationQueryFilter pagination)
         {
@@ -39,6 +41,7 @@ namespace Games.Api.Controllers
             return Ok(response);
         }
 
+        // ----------------------- CRUD EF / UOW -----------------------------
         [HttpGet]
         public async Task<IActionResult> Get()
         {
@@ -96,6 +99,7 @@ namespace Games.Api.Controllers
             catch (KeyNotFoundException) { return NotFound(); }
         }
 
+        // ----------------------- QUERIES ESPECIALES ------------------------
         [HttpGet("by-genre/{genre}")]
         public async Task<IActionResult> GetByGenre(string genre)
         {
@@ -147,6 +151,53 @@ namespace Games.Api.Controllers
             if (!games.Any()) return NotFound("No hay juegos en ese rango de edad.");
             return Ok(_mapper.Map<IEnumerable<GameDto>>(games));
         }
+
+        // ----------------------- DAPPER -----------------------
+        [HttpGet("dapper/latest")]
+        public async Task<IActionResult> GetLatest([FromQuery] int take = 10)
+        {
+            var rows = await _dapper.GetLatestAsync(take);
+            var dto = _mapper.Map<IEnumerable<GameDto>>(rows);
+            return Ok(new ApiResponse<IEnumerable<GameDto>>(dto));
+        }
+
+        [HttpGet("dapper/search")]
+        public async Task<IActionResult> SearchDapper([FromQuery] string title)
+        {
+            var rows = await _dapper.SearchAsync(title);
+            if (!rows.Any())
+                return NotFound($"No se encontraron juegos con el título que contenga: '{title}'");
+            var dto = _mapper.Map<IEnumerable<GameDto>>(rows);
+            return Ok(new ApiResponse<IEnumerable<GameDto>>(dto));
+        }
+
+        [HttpGet("dapper/top")]
+        public async Task<IActionResult> TopDapper([FromQuery] int take = 5)
+        {
+            var rows = await _dapper.TopRatedAsync(take);
+            var result = rows.Select(t =>
+            {
+                var dto = _mapper.Map<GameDto>(t.Game);
+                dto.AverageScore = Math.Round(t.AvgScore, 2);
+                dto.ReviewsCount = t.ReviewsCount;
+                return dto;
+            });
+            return Ok(new ApiResponse<IEnumerable<GameDto>>(result));
+        }
+
+        [HttpGet("dapper/low")]
+        public async Task<IActionResult> LowDapper([FromQuery] int take = 5)
+        {
+            var rows = await _dapper.LowRatedAsync(take);
+            var result = rows.Select(t =>
+            {
+                var dto = _mapper.Map<GameDto>(t.Game);
+                dto.AverageScore = Math.Round(t.AvgScore, 2);
+                dto.ReviewsCount = t.ReviewsCount;
+                return dto;
+            });
+            return Ok(new ApiResponse<IEnumerable<GameDto>>(result));
+        }
     }
 
     // =========================================================
@@ -165,7 +216,6 @@ namespace Games.Api.Controllers
             _mapper = mapper;
         }
 
-        // GET: /api/users/filter?name=...&email=...&isActive=true&pageNumber=1&pageSize=10
         [HttpGet("filter")]
         public async Task<IActionResult> Filter([FromQuery] UserQueryFilter filters, [FromQuery] PaginationQueryFilter pagination)
         {
@@ -251,7 +301,6 @@ namespace Games.Api.Controllers
             _mapper = mapper;
         }
 
-        // GET: /api/games/{gameId}/reviews
         [HttpGet]
         public async Task<IActionResult> Get(int gameId)
         {
@@ -259,7 +308,6 @@ namespace Games.Api.Controllers
             return Ok(_mapper.Map<IEnumerable<ReviewDto>>(reviews));
         }
 
-        // GET: /api/games/{gameId}/reviews/{id}
         [HttpGet("{id:int}")]
         public async Task<IActionResult> GetById(int gameId, int id)
         {
@@ -316,8 +364,6 @@ namespace Games.Api.Controllers
             catch (KeyNotFoundException) { return NotFound(); }
         }
 
-        // ---------- FILTRO GLOBAL DE REVIEWS (ruta absoluta) ----------
-        // GET: /api/reviews/filter?gameId=1&userId=...&minScore=...&pageNumber=1&pageSize=10
         [HttpGet("~/api/reviews/filter")]
         public async Task<IActionResult> FilterAll([FromQuery] ReviewQueryFilter filters, [FromQuery] PaginationQueryFilter pagination)
         {

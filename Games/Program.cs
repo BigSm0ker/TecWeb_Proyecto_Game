@@ -1,20 +1,21 @@
 using Microsoft.EntityFrameworkCore;
-using Games.Infrastructure.Data;
+using Microsoft.OpenApi.Models;
 
-using AutoMapper;
+using Games.Infrastructure.Data;            // GamesContext (EF)
 using Games.Infrastructure.Mappings;
 
-using Gamess.Core.Interfaces;
-using Games.Infrastructure.Repositories;
-
-using Gamess.Core.Services;
-
 using FluentValidation;
-using Games.Infrastructure.Filters;
-using Games.Infrastructure.Validators;
 
-using Microsoft.OpenApi.Models; // Swagger
+using Gamess.Core.Interfaces;               // IUnitOfWork, repos y servicios (Core)
+using Games.Infrastructure.Repositories;    // EF repos
+using Gamess.Core.Services;                 // Services EF
 
+using Games.Infrastructure.Filters;         // ValidationFilter, GlobalExceptionFilter
+using Games.Infrastructure.Validators;      // FluentValidation DTO validators
+
+using Gamess.Infraestructure.Data;          
+using Gamess.Infraestructure.Repositories;  
+using Gamess.Core.Services;                
 namespace Games
 {
     public class Program
@@ -23,70 +24,51 @@ namespace Games
         {
             var builder = WebApplication.CreateBuilder(args);
 
-            // ===========================
             // 1) Base de Datos (MySQL)
-            // ===========================
             var csMySql = builder.Configuration.GetConnectionString("ConnectionMySql");
             builder.Services.AddDbContext<GamesContext>(options =>
                 options.UseMySql(csMySql, ServerVersion.AutoDetect(csMySql)));
 
-            // ===========================
-            // 2) MVC + JSON + Filtro Validación
-            // ===========================
+            // 2) MVC + JSON + Filtros
             builder.Services
                 .AddControllers(opts =>
                 {
-                    // Filtro global de FluentValidation
                     opts.Filters.Add<ValidationFilter>();
-                    opts.Filters.Add<GlobalExceptionFilter>(); 
+                    opts.Filters.Add<GlobalExceptionFilter>();
                 })
-                .AddNewtonsoftJson(options =>
+                .AddNewtonsoftJson(o =>
                 {
-                    // Evita ciclos de navegación (Game -> Reviews -> Game ...)
-                    options.SerializerSettings.ReferenceLoopHandling =
+                    o.SerializerSettings.ReferenceLoopHandling =
                         Newtonsoft.Json.ReferenceLoopHandling.Ignore;
                 })
-                .ConfigureApiBehaviorOptions(options =>
+                .ConfigureApiBehaviorOptions(o =>
                 {
-                    // Dejamos a FluentValidation manejar errores de modelo
-                    options.SuppressModelStateInvalidFilter = true;
+                    o.SuppressModelStateInvalidFilter = true;
                 });
 
-            // ===========================
             // 3) AutoMapper
-            // ===========================
             builder.Services.AddAutoMapper(typeof(MappingProfile));
 
-            // ===========================
-            // 4) Repositorios (Scoped recomendado con EF Core)
-            // ===========================
+            // 4) Repos EF
             builder.Services.AddScoped<IUserRepository, UserRepository>();
             builder.Services.AddScoped<IGameRepository, GameRepository>();
             builder.Services.AddScoped<IReviewRepository, ReviewRepository>();
 
-            // ===========================
-            // 5) Servicios de Dominio
-            // ===========================
+            // 5) Servicios EF
             builder.Services.AddScoped<IGameService, GameService>();
             builder.Services.AddScoped<IUserService, UserService>();
             builder.Services.AddScoped<IReviewService, ReviewService>();
 
-            // ===========================
             // 6) Unit of Work
-            // ===========================
             builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 
-            // ===========================
-            // 7) Validaciones (FluentValidation)
-            // ===========================
+            // 7) FluentValidation
             builder.Services.AddValidatorsFromAssemblyContaining<GameDtoValidator>();
             builder.Services.AddValidatorsFromAssemblyContaining<UserDtoValidator>();
             builder.Services.AddValidatorsFromAssemblyContaining<ReviewDtoValidator>();
             builder.Services.AddScoped<IValidationService, ValidationService>();
 
-            // ===========================
-            // 8) Swagger (PDF pide doc del controlador)
-            // ===========================
+            // 8) Swagger
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddSwaggerGen(c =>
             {
@@ -94,23 +76,23 @@ namespace Games
                 {
                     Title = "Games API",
                     Version = "v1",
-                    Description = "API de Games con Users y Reviews (Repositorio, UoW, Validación)."
+                    Description = "API de Games con Users y Reviews (Repositorio, UoW, Validación, Dapper)."
                 });
             });
 
-            // ===========================
-            // 9) Pipeline HTTP
-            // ===========================
+            // 9) Dapper & Factory
+            builder.Services.AddSingleton<IDbConnectionFactory, DbConnectionFactory>();
+            builder.Services.AddScoped<IDapperContext, DapperContext>();
+            builder.Services.AddScoped<IGameDapperRepository, GameDapperRepository>();
+            builder.Services.AddScoped<IGameDapperService, GameDapperService>();
+
+            // 10) Pipeline HTTP
             var app = builder.Build();
 
-            // Swagger solo en Development (puedes activarlo siempre si quieres)
             if (app.Environment.IsDevelopment())
             {
                 app.UseSwagger();
-                app.UseSwaggerUI(c =>
-                {
-                    c.SwaggerEndpoint("/swagger/v1/swagger.json", "Games API v1");
-                });
+                app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "Games API v1"));
             }
 
             app.UseHttpsRedirection();

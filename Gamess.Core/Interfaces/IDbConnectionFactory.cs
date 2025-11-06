@@ -1,12 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.Data;
 
-namespace Gamess.Core.Interfaces
+namespace Gamess.Infraestructure.Data
 {
-    internal class IDbConnectionFactory
+    public interface IDbConnectionFactory
     {
+        IDbConnection CreateConnection();
     }
 }
