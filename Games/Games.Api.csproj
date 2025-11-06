@@ -25,5 +25,9 @@
     <ProjectReference Include="..\Games.Infraestructure\Games.Infraestructure.csproj" />
     <ProjectReference Include="..\Gamess.Core\Gamess.Core.csproj" />
   </ItemGroup>
+	<PropertyGroup>
+		<GenerateDocumentationFile>true</GenerateDocumentationFile>
+	</PropertyGroup>
+
 
 </Project>
