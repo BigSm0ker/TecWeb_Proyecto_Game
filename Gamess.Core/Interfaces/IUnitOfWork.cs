@@ -8,6 +8,7 @@ namespace Gamess.Core.Interfaces
         IUserRepository Users { get; }
         IGameRepository Games { get; }
         IReviewRepository Reviews { get; }
+        ISecurityRepository Securities { get; }
 
         Task<int> CommitAsync(CancellationToken cancellationToken = default);
     }

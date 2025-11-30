@@ -10,17 +10,20 @@ namespace Games.Infrastructure.Repositories
         public IUserRepository Users { get; }
         public IGameRepository Games { get; }
         public IReviewRepository Reviews { get; }
+        public ISecurityRepository Securities { get; }
 
         public UnitOfWork(
             GamesContext ctx,
             IUserRepository users,
             IGameRepository games,
-            IReviewRepository reviews)
+            IReviewRepository reviews,
+            ISecurityRepository securities)
         {
             _ctx = ctx;
             Users = users;
             Games = games;
             Reviews = reviews;
+            Securities = securities;
         }
 
         public Task<int> CommitAsync(CancellationToken cancellationToken = default)
