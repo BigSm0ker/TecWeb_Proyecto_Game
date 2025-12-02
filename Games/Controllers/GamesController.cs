@@ -14,7 +14,7 @@ namespace Games.Api.Controllers
 {
 
     // GAMES
-    //[Authorize]
+    [Authorize]
     [Route("api/[controller]")]
     [ApiController]
     public class GamesController : ControllerBase
