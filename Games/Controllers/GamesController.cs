@@ -7,12 +7,14 @@ using Gamess.Core.QueryFilters;
 using Gamess.Core.CustomEntities;
 using Games.Api.Responses;
 using Gamess.Infraestructure.DTOs;
+using Microsoft.AspNetCore.Authorization;
+using Gamess.Core.Enum;
 
 namespace Games.Api.Controllers
 {
 
     // GAMES
-
+    [Authorize]
     [Route("api/[controller]")]
     [ApiController]
     public class GamesController : ControllerBase
@@ -56,6 +58,7 @@ namespace Games.Api.Controllers
         /// <returns>Una lista de juegos.</returns>
         /// <response code="200">Retorna la lista de juegos.</response>
         /// <response code="500">Error interno del servidor.</response>
+        [AllowAnonymous]
         [HttpGet]
         public async Task<IActionResult> Get()
         {
@@ -131,6 +134,7 @@ namespace Games.Api.Controllers
         /// <param name="id">ID del juego a eliminar.</param>
         /// <response code="204">Juego eliminado correctamente.</response>
         /// <response code="404">Si el juego no se encuentra.</response>
+        [Authorize(Roles = nameof(RoleType.Administrator))]
         [HttpDelete("{id:int}")]
         public async Task<IActionResult> Delete(int id)
         {

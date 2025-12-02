@@ -14,13 +14,15 @@ namespace Gamess.Core.Services
 
         public async Task<Security?> GetLoginByCredentials(UserLogin login)
         {
-            
-            return null;
+            return await _unitOfWork.Securities.GetLoginByCredentials(login);
         }
 
         public async Task RegisterUser(Security security)
         {
-         
+            
+
+            await _unitOfWork.Securities.AddAsync(security);
+            await _unitOfWork.CommitAsync();
         }
     }
 }

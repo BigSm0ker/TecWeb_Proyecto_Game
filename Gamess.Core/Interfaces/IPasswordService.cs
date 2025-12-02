@@ -1,12 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace Gamess.Core.Interfaces
+﻿namespace Gamess.Core.Interfaces
 {
-    internal class IPasswordService
+    public interface IPasswordService
     {
+        string Hash(string password);
+        bool Check(string hash, string password);
     }
 }
